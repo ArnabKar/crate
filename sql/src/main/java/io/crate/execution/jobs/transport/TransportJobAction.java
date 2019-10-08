@@ -51,7 +51,7 @@ import java.util.function.UnaryOperator;
 public class TransportJobAction implements NodeAction<JobRequest, JobResponse> {
 
     private static final String ACTION_NAME = "internal:crate:sql/job";
-    private static final String EXECUTOR = ThreadPool.Names.SEARCH;
+    private static final String EXECUTOR = ThreadPool.Names.SAME;
 
     private final IndicesService indicesService;
     private final Transports transports;
