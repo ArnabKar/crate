@@ -69,9 +69,10 @@ public class WhereClauseAnalyzer {
             return WhereClause.NO_MATCH;
         }
         PartitionResult partitionResult = resolvePartitions(where.queryOrFallback(), table, functions, coordinatorTxnCtx);
-        if (!where.partitions().isEmpty()
+        List<String> partitions = where.partitions();
+        if (partitions != null && !partitions.isEmpty()
             && !partitionResult.partitions.isEmpty()
-            && !partitionResult.partitions.equals(where.partitions())) {
+            && !partitionResult.partitions.equals(partitions)) {
 
             throw new IllegalArgumentException("Given partition ident does not match partition evaluated from where clause");
         }

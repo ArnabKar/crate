@@ -134,8 +134,9 @@ public final class DeletePlanner {
                 subQueryResults,
                 plannerContext.transactionContext()
             );
-            if (!where.partitions().isEmpty() && !where.hasQuery()) {
-                DeleteIndexRequest request = new DeleteIndexRequest(where.partitions().toArray(new String[0]));
+            List<String> partitions = where.partitions();
+            if (partitions != null && !partitions.isEmpty() && !where.hasQuery()) {
+                DeleteIndexRequest request = new DeleteIndexRequest(partitions.toArray(new String[0]));
                 request.indicesOptions(IndicesOptions.lenientExpandOpen());
                 executor.transportActionProvider().transportDeleteIndexAction()
                     .execute(request, new OneRowActionListener<>(consumer, o -> new Row1(-1L)));

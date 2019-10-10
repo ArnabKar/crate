@@ -240,10 +240,11 @@ public class DocTableInfo implements TableInfo, ShardedTable, StoredTable {
                               RoutingProvider.ShardSelection shardSelection,
                               SessionContext sessionContext) {
         String[] indices;
-        if (whereClause.partitions().isEmpty()) {
-            indices = concreteOpenIndices;
+        List<String> partitions = whereClause.partitions();
+        if (partitions == null) {
+            indices = concreteIndices;
         } else {
-            indices = whereClause.partitions().toArray(new String[0]);
+            indices = partitions.toArray(new String[0]);
         }
         Map<String, Set<String>> routingMap = null;
         if (whereClause.clusteredBy().isEmpty() == false) {

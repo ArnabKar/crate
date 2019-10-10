@@ -28,9 +28,8 @@ import io.crate.expression.symbol.Literal;
 import io.crate.expression.symbol.Symbol;
 import io.crate.expression.symbol.Symbols;
 import io.crate.metadata.doc.DocSysColumns;
-import org.elasticsearch.common.Nullable;
 
-import java.util.Collections;
+import javax.annotation.Nullable;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -42,8 +41,9 @@ public class WhereClause extends QueryClause {
     public static final WhereClause MATCH_ALL = new WhereClause(Literal.BOOLEAN_TRUE);
     public static final WhereClause NO_MATCH = new WhereClause(Literal.BOOLEAN_FALSE);
 
-    private Set<Symbol> clusteredBy = Collections.emptySet();
-    private List<String> partitions = Collections.emptyList();
+    private final Set<Symbol> clusteredBy;
+
+    private final List<String> partitions;
 
 
     public WhereClause(@Nullable Symbol normalizedQuery,
@@ -51,12 +51,14 @@ public class WhereClause extends QueryClause {
                        Set<Symbol> clusteredBy) {
         super(normalizedQuery);
         this.clusteredBy = clusteredBy;
-        if (partitions != null) {
-            this.partitions = partitions;
-        }
+        this.partitions = partitions;
         if (query != null) {
             validateVersioningColumnsUsage();
         }
+    }
+
+    public WhereClause(@Nullable Symbol query) {
+        this(query, null, Set.of());
     }
 
     private void validateVersioningColumnsUsage() {
@@ -77,10 +79,6 @@ public class WhereClause extends QueryClause {
                 }
             }
         }
-    }
-
-    public WhereClause(@Nullable Symbol query) {
-        super(query);
     }
 
     public Set<Symbol> clusteredBy() {
@@ -105,10 +103,12 @@ public class WhereClause extends QueryClause {
      * Returns a predefined list of partitions this query can be executed on
      * instead of the entire partition set.
      * <p>
-     * If the list is empty no prefiltering can be done.
+     * If the list is empty no partition can match.
+     * If `null` partition narrowing logic hasn't been applied and it is unknown which partitions could match.
      * <p>
      * Note that the NO_MATCH case has to be tested separately.
      */
+    @Nullable
     public List<String> partitions() {
         return partitions;
     }
@@ -127,11 +127,11 @@ public class WhereClause extends QueryClause {
     }
 
     public boolean hasVersions() {
-        return query != null && Symbols.containsColumn(query, DocSysColumns.VERSION);
+        return Symbols.containsColumn(query, DocSysColumns.VERSION);
     }
 
     public boolean hasSeqNoAndPrimaryTerm() {
-        return query != null && Symbols.containsColumn(query, DocSysColumns.SEQ_NO) &&
+        return Symbols.containsColumn(query, DocSysColumns.SEQ_NO) &&
                Symbols.containsColumn(query, DocSysColumns.PRIMARY_TERM);
     }
 

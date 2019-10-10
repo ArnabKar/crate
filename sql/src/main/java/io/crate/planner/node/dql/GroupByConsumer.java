@@ -48,7 +48,8 @@ public class GroupByConsumer {
          * so one shard doesn't contain all "clustered by" values
          * -> need to use a distributed group by.
          */
-        if (tableInfo.isPartitioned() && whereClause.partitions().size() != 1) {
+        List<String> partitions = whereClause.partitions();
+        if (tableInfo.isPartitioned() && (partitions == null || partitions.size() != 1)) {
             return false;
         }
 

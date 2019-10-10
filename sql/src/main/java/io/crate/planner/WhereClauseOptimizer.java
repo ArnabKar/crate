@@ -132,11 +132,7 @@ public final class WhereClauseOptimizer {
                     clusteredBy
                 );
             } else {
-                return new WhereClause(
-                    boundQuery,
-                    Collections.emptyList(),
-                    clusteredBy
-                );
+                return new WhereClause(boundQuery, null, clusteredBy);
             }
         }
     }
