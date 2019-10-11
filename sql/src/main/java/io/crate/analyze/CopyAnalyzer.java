@@ -218,7 +218,7 @@ class CopyAnalyzer {
             columnsDefined = true;
         } else {
             Reference sourceRef;
-            if (tableRelation.tableInfo().isPartitioned() && partitions.isEmpty()) {
+            if (tableRelation.tableInfo().isPartitioned() && (partitions == null || partitions.isEmpty())) {
                 // table is partitioned, insert partitioned columns into the output
                 overwrites = new HashMap<>();
                 for (Reference reference : tableRelation.tableInfo().partitionedByColumns()) {

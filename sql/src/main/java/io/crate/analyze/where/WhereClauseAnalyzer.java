@@ -122,7 +122,7 @@ public class WhereClauseAnalyzer {
             assert normalized != null : "normalizing a query must not return null";
 
             if (normalized.equals(query)) {
-                return new PartitionResult(query, Collections.emptyList()); // no partition columns inside the where clause
+                return new PartitionResult(query, Lists2.map(tableInfo.partitions(), PartitionName::asIndexName)); // no partition columns inside the where clause
             }
 
             boolean canMatch = WhereClause.canMatch(normalized);
