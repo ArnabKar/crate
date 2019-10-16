@@ -28,8 +28,8 @@ import static com.google.common.base.MoreObjects.firstNonNull;
 
 public class Paging {
 
-    // this must not be final so tests could adjust it
-    public static int PAGE_SIZE = 500_000;
+    // this must not be final so tests can adjust it
+    public static int PAGE_SIZE = 50_000;
     private static final double OVERHEAD_FACTOR = 1.5;
 
     public static int getWeightedPageSize(@Nullable Integer limit, double weight) {
