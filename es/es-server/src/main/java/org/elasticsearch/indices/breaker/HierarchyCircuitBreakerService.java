@@ -255,6 +255,10 @@ public class HierarchyCircuitBreakerService extends CircuitBreakerService {
         long totalUsed = parentUsed(newBytesReserved);
         long parentLimit = this.parentSettings.getLimit();
         if (totalUsed > parentLimit) {
+            System.gc();
+            if (parentUsed(newBytesReserved) < parentLimit) {
+                return;
+            }
             this.parentTripCount.incrementAndGet();
             final StringBuilder message = new StringBuilder("[parent] Data too large, data for [" + label + "]" +
                     " would be [" + totalUsed + "/" + new ByteSizeValue(totalUsed) + "]" +
