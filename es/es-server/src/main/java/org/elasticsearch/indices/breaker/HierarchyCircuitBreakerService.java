@@ -255,8 +255,8 @@ public class HierarchyCircuitBreakerService extends CircuitBreakerService {
         long totalUsed = parentUsed(newBytesReserved);
         long parentLimit = this.parentSettings.getLimit();
         if (totalUsed > parentLimit) {
-            System.gc();
-            if (parentUsed(newBytesReserved) < parentLimit) {
+            long maxHeap = MEMORY_MX_BEAN.getHeapMemoryUsage().getMax();
+            if (breakers.values().stream().allMatch(x -> x.getUsed() < (maxHeap * 0.10))) {
                 return;
             }
             this.parentTripCount.incrementAndGet();
