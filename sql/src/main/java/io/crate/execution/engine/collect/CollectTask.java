@@ -30,6 +30,7 @@ import io.crate.data.Row;
 import io.crate.data.RowConsumer;
 import io.crate.execution.dsl.phases.CollectPhase;
 import io.crate.execution.dsl.phases.RoutedCollectPhase;
+import io.crate.execution.dsl.projection.GroupProjection;
 import io.crate.execution.jobs.AbstractTask;
 import io.crate.execution.jobs.SharedShardContexts;
 import io.crate.metadata.RowGranularity;
@@ -166,10 +167,12 @@ public class CollectTask extends AbstractTask {
     static String threadPoolName(CollectPhase phase, boolean involvedIO) {
         if (phase instanceof RoutedCollectPhase) {
             RoutedCollectPhase collectPhase = (RoutedCollectPhase) phase;
-            if (collectPhase.maxRowGranularity() == RowGranularity.NODE
-                       || collectPhase.maxRowGranularity() == RowGranularity.SHARD) {
+            if (collectPhase.maxRowGranularity() == RowGranularity.NODE || collectPhase.maxRowGranularity() == RowGranularity.SHARD) {
                 // Node or Shard system table collector
                 return ThreadPool.Names.GET;
+            }
+            if (collectPhase.projections().stream().anyMatch(x -> x instanceof GroupProjection)) {
+                return ThreadPool.Names.GROUP_BY;
             }
         }
         // If there is no IO involved it is a in-memory system tables. These are usually fast and the overhead
