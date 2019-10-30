@@ -62,6 +62,9 @@ Deprecations
 Changes
 =======
 
+- Added a ``failures`` column to the :ref:`sys.snapshots <sys-snapshots>`
+  table.
+
 - Added support for CIDR notation comparisons through special purpose
   operator ``<<`` associated with type ip.
   Statements like ``192.168.0.0 << 192.168.0.1/24`` are true,
