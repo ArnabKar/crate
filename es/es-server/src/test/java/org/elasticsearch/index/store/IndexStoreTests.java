@@ -20,6 +20,7 @@
 package org.elasticsearch.index.store;
 
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.IOContext;
 import org.apache.lucene.store.MMapDirectory;
 import org.apache.lucene.store.NIOFSDirectory;
 import org.apache.lucene.store.NoLockFactory;
@@ -39,6 +40,7 @@ import org.junit.Test;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Locale;
 
 public class IndexStoreTests extends ESTestCase {
@@ -53,6 +55,16 @@ public class IndexStoreTests extends ESTestCase {
         for (IndexModule.Type type : IndexModule.Type.values()) {
             doTestStoreDirectory(index, tempDir, type.name().toLowerCase(Locale.ROOT), type);
         }
+    }
+
+    @Test
+    public void test_foo() throws Throwable {
+        MMapDirectory directory = new MMapDirectory(Paths.get("/home/jordi/workspace/tmp/corrupt_indices"));
+        Store.VerifyingIndexInput verifyingIndexInput = new Store.VerifyingIndexInput(
+            directory.openInput("_397j.cfs", IOContext.READONCE));
+
+        long verify = verifyingIndexInput.verify();
+        System.out.println(verify);
     }
 
     private void doTestStoreDirectory(Index index,

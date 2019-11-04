@@ -72,7 +72,7 @@ public class EnterpriseLicenseService implements LicenseService, ClusterStateLis
 
     static final long UNLIMITED_EXPIRY_DATE_IN_MS = Long.MAX_VALUE;
     static final int MAX_NODES_FOR_V1_LICENSES = 10;
-    private static final int MAX_NODES_FOR_V2_LICENSES = 3;
+    private static final int MAX_NODES_FOR_V2_LICENSES = 5;
 
     private final Logger logger;
     private final TransportService transportService;

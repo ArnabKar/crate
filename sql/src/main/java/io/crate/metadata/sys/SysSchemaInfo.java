@@ -44,7 +44,7 @@ public class SysSchemaInfo implements SchemaInfo {
     @Inject
     public SysSchemaInfo(ClusterService clusterService) {
         tableInfos = new HashMap<>();
-        tableInfos.put(SysClusterTableInfo.IDENT.name(), new SysClusterTableInfo());
+        tableInfos.put(SysClusterTableInfo.IDENT.name(), new SysClusterTableInfo(clusterService));
         tableInfos.put(SysNodesTableInfo.IDENT.name(), new SysNodesTableInfo());
         tableInfos.put(SysShardsTableInfo.IDENT.name(), new SysShardsTableInfo());
         Supplier<DiscoveryNode> localNode = clusterService::localNode;

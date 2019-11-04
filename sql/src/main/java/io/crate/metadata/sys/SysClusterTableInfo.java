@@ -23,6 +23,7 @@ package io.crate.metadata.sys;
 
 import io.crate.action.sql.SessionContext;
 import io.crate.analyze.WhereClause;
+import io.crate.execution.engine.collect.NestableCollectExpression;
 import io.crate.expression.reference.sys.cluster.ClusterLoggingOverridesExpression;
 import io.crate.expression.reference.sys.cluster.ClusterSettingsExpression;
 import io.crate.metadata.RelationName;
@@ -37,8 +38,16 @@ import io.crate.types.ArrayType;
 import io.crate.types.DataTypes;
 import io.crate.types.ObjectType;
 import org.elasticsearch.cluster.ClusterState;
+import org.elasticsearch.cluster.service.ClusterService;
+import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.xcontent.ToXContent;
+import org.elasticsearch.common.xcontent.XContentBuilder;
+import org.elasticsearch.common.xcontent.XContentHelper;
+import org.elasticsearch.common.xcontent.json.JsonXContent;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,8 +63,8 @@ public class SysClusterTableInfo extends StaticTableInfo<Void> {
 
     public static final RelationName IDENT = new RelationName(SysSchemaInfo.NAME, "cluster");
 
-    SysClusterTableInfo() {
-        super(IDENT, buildColumnRegistrar(), Collections.emptyList());
+    SysClusterTableInfo(ClusterService clusterService) {
+        super(IDENT, buildColumnRegistrar(clusterService), Collections.emptyList());
     }
 
     @Override
@@ -72,11 +81,24 @@ public class SysClusterTableInfo extends StaticTableInfo<Void> {
         return RowGranularity.CLUSTER;
     }
 
-    private static ColumnRegistrar<Void> buildColumnRegistrar() {
+    private static ColumnRegistrar<Void> buildColumnRegistrar(ClusterService clusterService) {
         return new ColumnRegistrar<Void>(IDENT, RowGranularity.CLUSTER)
             .register("id", DataTypes.STRING)
             .register("name", DataTypes.STRING)
             .register("master_node", DataTypes.STRING)
+            .register("_state", ObjectType.untyped(), () -> NestableCollectExpression.forFunction(aVoid -> {
+                try {
+                    XContentBuilder builder = JsonXContent.contentBuilder();
+                    clusterService.state().toXContent(builder, ToXContent.EMPTY_PARAMS);
+                    return XContentHelper.convertToMap(
+                        BytesReference.bytes(builder),
+                        false,
+                        builder.contentType()
+                    ).v2();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }))
             .register("license",
                 ObjectType.builder()
                     .setInnerType(EXPIRY_DATE, DataTypes.TIMESTAMPZ)

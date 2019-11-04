@@ -40,5 +40,6 @@ public class SysClusterExpressionModule extends AbstractModule {
         b.addBinding(new ColumnIdent(ClusterMasterNodeExpression.NAME)).to(ClusterMasterNodeExpression.class).asEagerSingleton();
         b.addBinding(new ColumnIdent(ClusterSettingsExpression.NAME)).to(ClusterSettingsExpression.class).asEagerSingleton();
         b.addBinding(new ColumnIdent(ClusterLicenseExpression.NAME)).to(ClusterLicenseExpression.class).asEagerSingleton();
+        b.addBinding(new ColumnIdent("_state")).to(ClusterStateExpression.class).asEagerSingleton();
     }
 }
