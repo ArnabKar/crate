@@ -35,6 +35,7 @@ import io.crate.expression.reference.doc.lucene.LuceneReferenceResolver;
 import io.crate.expression.symbol.Symbols;
 import io.crate.lucene.FieldTypeLookup;
 import io.crate.metadata.CoordinatorTxnCtx;
+import io.crate.metadata.DocReferences;
 import io.crate.metadata.Functions;
 import io.crate.metadata.Reference;
 import io.crate.metadata.RelationName;
@@ -111,7 +112,7 @@ public final class ReservoirSampler {
             FieldTypeLookup fieldTypeLookup = indexService.mapperService()::fullName;
             var ctx = new DocInputFactory(
                 functions, fieldTypeLookup, new LuceneReferenceResolver(fieldTypeLookup)).getCtx(coordinatorTxnCtx);
-            ctx.add(columns);
+            ctx.add(Lists2.map(columns, DocReferences::toSourceLookup));
             List<Input<?>> inputs = ctx.topLevelInputs();
             List<? extends LuceneCollectorExpression<?>> expressions = ctx.expressions();
             CollectorContext collectorContext = new CollectorContext(indexService.newQueryShardContext()::getForField);
