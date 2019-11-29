@@ -21,13 +21,17 @@
 
 package io.crate.breaker;
 
+import io.crate.exceptions.Exceptions;
 import io.crate.execution.dsl.phases.ExecutionPhase;
+import org.apache.datasketches.memory.WritableDirectHandle;
+import org.apache.datasketches.memory.WritableMemory;
+import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.elasticsearch.common.breaker.CircuitBreaker;
 import org.elasticsearch.common.breaker.CircuitBreakingException;
-import org.apache.logging.log4j.LogManager;
 
 import javax.annotation.concurrent.ThreadSafe;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 @ThreadSafe
@@ -44,6 +48,8 @@ public class RamAccountingContext implements RamAccounting {
     private final AtomicLong flushBuffer = new AtomicLong(0);
     private volatile boolean closed = false;
     private volatile boolean tripped = false;
+
+    private final ArrayList<AutoCloseable> resourcesToRelease = new ArrayList<>();
 
     private static final Logger LOGGER = LogManager.getLogger(RamAccountingContext.class);
 
@@ -66,6 +72,14 @@ public class RamAccountingContext implements RamAccounting {
     @Override
     public void addBytes(long bytes) throws CircuitBreakingException {
         addBytes(bytes, true);
+    }
+
+    public WritableMemory allocateDirect(long capacityBytes) {
+        WritableDirectHandle handle = WritableMemory.allocateDirect(capacityBytes);
+        synchronized (resourcesToRelease) {
+            resourcesToRelease.add(handle);
+        }
+        return handle.get();
     }
 
     /**
@@ -154,6 +168,14 @@ public class RamAccountingContext implements RamAccounting {
             return;
         }
         closed = true;
+        ArrayList<Exception> exceptions = new ArrayList<>();
+        for (AutoCloseable autoCloseable : resourcesToRelease) {
+            try {
+                autoCloseable.close();
+            } catch (Exception e) {
+                exceptions.add(e);
+            }
+        }
         if (totalBytes.get() != 0) {
             if (LOGGER.isTraceEnabled() && totalBytes() > FLUSH_BUFFER_SIZE) {
                 LOGGER.trace("context: {} bytes; breaker: {} of {} bytes", totalBytes(), breaker.getUsed(), breaker.getLimit());
@@ -161,6 +183,9 @@ public class RamAccountingContext implements RamAccounting {
             breaker.addWithoutBreaking(-totalBytes.get());
         }
         totalBytes.addAndGet(flushBuffer.getAndSet(0));
+        if (!exceptions.isEmpty()) {
+            Exceptions.rethrowRuntimeException(exceptions.get(0));
+        }
     }
 
     /**

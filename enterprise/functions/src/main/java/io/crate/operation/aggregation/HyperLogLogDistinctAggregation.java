@@ -39,13 +39,17 @@ import io.crate.types.LongType;
 import io.crate.types.ShortType;
 import io.crate.types.StringType;
 import io.crate.types.TimestampType;
+import org.apache.datasketches.hll.HllSketch;
+import org.apache.datasketches.hll.TgtHllType;
+import org.apache.datasketches.hll.Union;
+import org.apache.datasketches.memory.Memory;
+import org.apache.datasketches.memory.WritableMemory;
 import org.elasticsearch.Version;
 import org.elasticsearch.common.breaker.CircuitBreakingException;
 import org.elasticsearch.common.hash.MurmurHash3;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Writeable;
-import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.search.aggregations.metrics.cardinality.HyperLogLogPlusPlus;
 
 import javax.annotation.Nullable;
@@ -96,8 +100,7 @@ public class HyperLogLogDistinctAggregation extends AggregationFunction<HyperLog
             if (args.length > 1) {
                 precision = DataTypes.INTEGER.value(args[1].value());
             }
-            ramAccountingContext.addBytes(HyperLogLogPlusPlus.memoryUsage(precision));
-            state.init(precision);
+            state.init(precision, ramAccountingContext);
         }
         Object value = args[0].value();
         if (value != null) {
@@ -139,10 +142,7 @@ public class HyperLogLogDistinctAggregation extends AggregationFunction<HyperLog
 
         private final DataType dataType;
         private final Murmur3Hash murmur3Hash;
-
-        // Although HyperLogLogPlus implements Releasable we do not close instances.
-        // We're using BigArrays.NON_RECYCLING_INSTANCE and instances created using it are not accounted / recycled
-        private HyperLogLogPlusPlus hyperLogLogPlusPlus;
+        private Union hllSketch;
 
         HllState(DataType dataType) {
             this.dataType = dataType;
@@ -153,38 +153,36 @@ public class HyperLogLogDistinctAggregation extends AggregationFunction<HyperLog
             dataType = DataTypes.fromStream(in);
             murmur3Hash = Murmur3Hash.getForType(dataType);
             if (in.readBoolean()) {
-                hyperLogLogPlusPlus = HyperLogLogPlusPlus.readFrom(in, BigArrays.NON_RECYCLING_INSTANCE);
+                hllSketch = Union.heapify(Memory.wrap(in.readByteArray()));
             }
         }
 
-        void init(int precision) {
-            assert hyperLogLogPlusPlus == null : "hyperLogLog algorithm was already initialized";
-            try {
-                hyperLogLogPlusPlus = new HyperLogLogPlusPlus(precision, BigArrays.NON_RECYCLING_INSTANCE, 1);
-            } catch (IllegalArgumentException e) {
-                throw new IllegalArgumentException("precision must be >= 4 and <= 18");
-            }
+        void init(int precision, RamAccountingContext ramAccountingContext) {
+            assert hllSketch == null : "hyperLogLog algorithm was already initialized";
+            int requiredBytes = HllSketch.getMaxUpdatableSerializationBytes(precision, TgtHllType.HLL_6);
+            WritableMemory writableMemory = ramAccountingContext.allocateDirect(requiredBytes);
+            hllSketch = new Union(precision, writableMemory);
         }
 
         boolean isInitialized() {
-            return hyperLogLogPlusPlus != null;
+            return hllSketch != null;
         }
 
         void add(Object value) {
-            hyperLogLogPlusPlus.collect(0, murmur3Hash.hash(value));
+            hllSketch.update(murmur3Hash.hash(value));
         }
 
-        void merge(HllState state) {
-            hyperLogLogPlusPlus.merge(0, state.hyperLogLogPlusPlus, 0);
+        void merge(HllState other) {
+            hllSketch.update(other.hllSketch.getResult());
         }
 
         long value() {
-            return hyperLogLogPlusPlus.cardinality(0);
+            return (long) hllSketch.getEstimate();
         }
 
         @Override
         public int compareTo(HllState o) {
-            return java.lang.Long.compare(hyperLogLogPlusPlus.cardinality(0), o.hyperLogLogPlusPlus.cardinality(0));
+            return Double.compare(hllSketch.getEstimate(), o.hllSketch.getEstimate());
         }
 
         @Override
@@ -197,7 +195,8 @@ public class HyperLogLogDistinctAggregation extends AggregationFunction<HyperLog
             DataTypes.toStream(dataType, out);
             if (isInitialized()) {
                 out.writeBoolean(true);
-                hyperLogLogPlusPlus.writeTo(0, out);
+                byte[] bytes = hllSketch.toCompactByteArray();
+                out.writeByteArray(bytes);
             } else {
                 out.writeBoolean(false);
             }

@@ -12,6 +12,9 @@ configurations {
 dependencies {
     implementation project(':sql')
 
+    implementation "org.apache.datasketches:datasketches-java:1.1.0-incubating"
+    implementation "org.apache.datasketches:datasketches-memory:1.1.0-incubating"
+
     testImplementation project(path: ':sql', configuration: 'testOutput')
     testImplementation project(path: ':dex', configuration: 'testOutput')
     testImplementation project(':integration-testing')
