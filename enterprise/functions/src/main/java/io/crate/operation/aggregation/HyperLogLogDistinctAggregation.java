@@ -197,7 +197,7 @@ public class HyperLogLogDistinctAggregation extends AggregationFunction<HyperLog
             DataTypes.toStream(dataType, out);
             if (isInitialized()) {
                 out.writeBoolean(true);
-                hyperLogLogPlusPlus.writeTo(0, out);
+                hyperLogLogPlusPlus.writeTo(out);
             } else {
                 out.writeBoolean(false);
             }
