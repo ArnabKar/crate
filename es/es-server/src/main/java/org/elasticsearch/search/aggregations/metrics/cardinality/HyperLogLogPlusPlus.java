@@ -398,7 +398,7 @@ public final class HyperLogLogPlusPlus implements Releasable {
 
     @Override
     public void close() {
-        Releasables.close(runLens, hashSet.sizes);
+        Releasables.close(runLens);
     }
 
     /**
@@ -410,15 +410,14 @@ public final class HyperLogLogPlusPlus implements Releasable {
         private final int capacity;
         private final int threshold;
         private final int mask;
-        private IntArray sizes;
         private final BytesRef readSpare;
         private final ByteBuffer writeSpare;
+        private int size = 0;
 
         Hashset() {
             capacity = m / 4; // because ints take 4 bytes
             threshold = (int) (capacity * MAX_LOAD_FACTOR);
             mask = capacity - 1;
-            sizes = bigArrays.newIntArray(1);
             readSpare = new BytesRef();
             writeSpare = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN);
         }
@@ -449,10 +448,6 @@ public final class HyperLogLogPlusPlus implements Releasable {
         }
 
         public int size() {
-            if (0 >= sizes.size()) {
-                return 0;
-            }
-            final int size = sizes.get(0);
             assert size == recomputedSize();
             return size;
         }
@@ -462,14 +457,14 @@ public final class HyperLogLogPlusPlus implements Releasable {
          * Return {@code -1} if the value was already in the set or the new set size if it was added.
          */
         public int add(int k) {
-            sizes = bigArrays.grow(sizes, 1);
             assert k != 0;
             for (int i = (k & mask); ; i = (i + 1) & mask) {
                 final int v = get(i);
                 if (v == 0) {
                     // means unused, take it!
                     set(i, k);
-                    return sizes.increment(0, 1);
+                    size++;
+                    return size;
                 } else if (v == k) {
                     // k is already in the set
                     return -1;
