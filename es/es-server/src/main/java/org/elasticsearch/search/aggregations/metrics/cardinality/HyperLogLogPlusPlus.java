@@ -144,7 +144,7 @@ public final class HyperLogLogPlusPlus implements Releasable {
     };
 
     private final BigArrays bigArrays;
-    private final OpenBitSet algorithm;
+    private boolean algorithm = LINEAR_COUNTING;
     private ByteArray runLens;
     private final Hashset hashSet;
     private final int p, m;
@@ -160,7 +160,6 @@ public final class HyperLogLogPlusPlus implements Releasable {
         p = precision;
         m = 1 << p;
         this.bigArrays = bigArrays;
-        algorithm = new OpenBitSet();
         runLens = bigArrays.newByteArray(1 << p);
         hashSet = new Hashset(1);
         final double alpha;
@@ -191,12 +190,12 @@ public final class HyperLogLogPlusPlus implements Releasable {
             throw new IllegalArgumentException();
         }
         ensureCapacity();
-        if (other.algorithm.get(0) == LINEAR_COUNTING) {
+        if (other.algorithm == LINEAR_COUNTING) {
             final IntArray values = other.hashSet.values(0);
             try {
                 for (long i = 0; i < values.size(); ++i) {
                     final int encoded = values.get(i);
-                    if (algorithm.get(0) == LINEAR_COUNTING) {
+                    if (algorithm == LINEAR_COUNTING) {
                         collectLcEncoded(encoded);
                     } else {
                         collectHllEncoded(encoded);
@@ -206,7 +205,7 @@ public final class HyperLogLogPlusPlus implements Releasable {
                 Releasables.close(values);
             }
         } else {
-            if (algorithm.get(0) != HYPERLOGLOG) {
+            if (algorithm != HYPERLOGLOG) {
                 upgradeToHll();
             }
             final long thisStart = 0;
@@ -219,7 +218,7 @@ public final class HyperLogLogPlusPlus implements Releasable {
 
     public void collect(long hash) {
         ensureCapacity();
-        if (algorithm.get(0) == LINEAR_COUNTING) {
+        if (algorithm == LINEAR_COUNTING) {
             collectLc(hash);
         } else {
             collectHll(hash);
@@ -255,7 +254,7 @@ public final class HyperLogLogPlusPlus implements Releasable {
     }
 
     public long cardinality() {
-        if (algorithm.get(0) == LINEAR_COUNTING) {
+        if (algorithm == LINEAR_COUNTING) {
             return cardinalityLc();
         } else {
             return cardinalityHll();
@@ -302,7 +301,7 @@ public final class HyperLogLogPlusPlus implements Releasable {
                 final int encoded = values.get(i);
                 collectHllEncoded(encoded);
             }
-            algorithm.set(0);
+            algorithm = HYPERLOGLOG;
         } finally {
             Releasables.close(values);
         }
@@ -408,10 +407,10 @@ public final class HyperLogLogPlusPlus implements Releasable {
         Releasables.close(runLens, hashSet.sizes);
     }
 
-    private Object getComparableData(long bucket) {
-        if (algorithm.get(bucket) == LINEAR_COUNTING) {
+    private Object getComparableData() {
+        if (algorithm == LINEAR_COUNTING) {
             Set<Integer> values = new HashSet<>();
-            try (IntArray hashSetValues = hashSet.values(bucket)) {
+            try (IntArray hashSetValues = hashSet.values(0)) {
                 for (long i = 0; i < hashSetValues.size(); i++) {
                     values.add(hashSetValues.get(i));
                 }
@@ -420,7 +419,7 @@ public final class HyperLogLogPlusPlus implements Releasable {
         } else {
             Map<Byte, Integer> values = new HashMap<>();
             for (long i = 0; i < runLens.size(); i++) {
-                byte runLength = runLens.get((bucket << p) + i);
+                byte runLength = runLens.get(i);
                 Integer numOccurances = values.get(runLength);
                 if (numOccurances == null) {
                     values.put(runLength, 1);
@@ -433,13 +432,13 @@ public final class HyperLogLogPlusPlus implements Releasable {
     }
 
     public int hashCode(long bucket) {
-        return Objects.hash(p, algorithm.get(bucket), getComparableData(bucket));
+        return Objects.hash(p, algorithm, getComparableData());
     }
 
     public boolean equals(long bucket, HyperLogLogPlusPlus other) {
         return Objects.equals(p, other.p) &&
-                Objects.equals(algorithm.get(bucket), other.algorithm.get(bucket)) &&
-                Objects.equals(getComparableData(bucket), other.getComparableData(bucket));
+                Objects.equals(algorithm, other.algorithm) &&
+                Objects.equals(getComparableData(), other.getComparableData());
     }
 
     /**
@@ -539,7 +538,7 @@ public final class HyperLogLogPlusPlus implements Releasable {
 
     public void writeTo(long bucket, StreamOutput out) throws IOException {
         out.writeVInt(p);
-        if (algorithm.get(bucket) == LINEAR_COUNTING) {
+        if (algorithm == LINEAR_COUNTING) {
             out.writeBoolean(LINEAR_COUNTING);
             try (IntArray hashes = hashSet.values(bucket)) {
                 out.writeVLong(hashes.size());
@@ -560,46 +559,18 @@ public final class HyperLogLogPlusPlus implements Releasable {
         HyperLogLogPlusPlus counts = new HyperLogLogPlusPlus(precision, bigArrays);
         final boolean algorithm = in.readBoolean();
         if (algorithm == LINEAR_COUNTING) {
-            counts.algorithm.clear(0);
+            counts.algorithm = algorithm;
             final long size = in.readVLong();
             for (long i = 0; i < size; ++i) {
                 final int encoded = in.readInt();
                 counts.hashSet.add(0, encoded);
             }
         } else {
-            counts.algorithm.set(0);
+            counts.algorithm = algorithm;
             for (int i = 0; i < counts.m; ++i) {
                 counts.runLens.set(i, in.readByte());
             }
         }
         return counts;
     }
-
-    /** looks and smells like the old openbitset. */
-    static class OpenBitSet {
-        LongBitSet impl = new LongBitSet(64);
-
-        boolean get(long bit) {
-            if (bit < impl.length()) {
-                return impl.get(bit);
-            } else {
-                return false;
-            }
-        }
-
-        void ensureCapacity(long bit) {
-            impl = LongBitSet.ensureCapacity(impl, bit);
-        }
-
-        void set(long bit) {
-            ensureCapacity(bit);
-            impl.set(bit);
-        }
-
-        void clear(long bit) {
-            ensureCapacity(bit);
-            impl.clear(bit);
-        }
-    }
-
 }
