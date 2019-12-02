@@ -28,7 +28,6 @@ import org.elasticsearch.common.lease.Releasables;
 import org.elasticsearch.common.util.BigArrays;
 import org.elasticsearch.common.util.ByteArray;
 import org.elasticsearch.common.util.ByteUtils;
-import org.elasticsearch.common.util.IntArray;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -137,7 +136,6 @@ public final class HyperLogLogPlusPlus implements Releasable {
         10, 20, 40, 80, 220, 400, 900, 1800, 3100, 6500, 11500, 20000, 50000, 120000, 350000
     };
 
-    private final BigArrays bigArrays;
     private boolean algorithm = LINEAR_COUNTING;
     private final ByteArray runLens;
     private final Hashset hashSet;
@@ -153,7 +151,6 @@ public final class HyperLogLogPlusPlus implements Releasable {
         }
         p = precision;
         m = 1 << p;
-        this.bigArrays = bigArrays;
         runLens = bigArrays.newByteArray(1 << p);
         hashSet = new Hashset();
         final double alpha;
@@ -180,18 +177,14 @@ public final class HyperLogLogPlusPlus implements Releasable {
             throw new IllegalArgumentException();
         }
         if (other.algorithm == LINEAR_COUNTING) {
-            final IntArray values = other.hashSet.values();
-            try {
-                for (long i = 0; i < values.size(); ++i) {
-                    final int encoded = values.get(i);
-                    if (algorithm == LINEAR_COUNTING) {
-                        collectLcEncoded(encoded);
-                    } else {
-                        collectHllEncoded(encoded);
-                    }
+            final int[] values = other.hashSet.values();
+            for (int i = 0; i < values.length; ++i) {
+                final int encoded = values[i];
+                if (algorithm == LINEAR_COUNTING) {
+                    collectLcEncoded(encoded);
+                } else {
+                    collectHllEncoded(encoded);
                 }
-            } finally {
-                Releasables.close(values);
             }
         } else {
             if (algorithm != HYPERLOGLOG) {
@@ -281,17 +274,13 @@ public final class HyperLogLogPlusPlus implements Releasable {
     }
 
     private void upgradeToHll() {
-        final IntArray values = hashSet.values();
-        try {
-            runLens.fill(0, m, (byte) 0);
-            for (long i = 0; i < values.size(); ++i) {
-                final int encoded = values.get(i);
-                collectHllEncoded(encoded);
-            }
-            algorithm = HYPERLOGLOG;
-        } finally {
-            Releasables.close(values);
+        final int[] values = hashSet.values();
+        runLens.fill(0, m, (byte) 0);
+        for (int i = 0; i < values.length; ++i) {
+            final int encoded = values[i];
+            collectHllEncoded(encoded);
         }
+        algorithm = HYPERLOGLOG;
     }
 
     private static long linearCounting(long m, long v) {
@@ -465,9 +454,9 @@ public final class HyperLogLogPlusPlus implements Releasable {
             }
         }
 
-        public IntArray values() {
+        public int[] values() {
             final int size = size();
-            final IntArray values = bigArrays.newIntArray(size);
+            int[] values = new int[size];
             if (size == 0) {
                 return values;
             }
@@ -475,10 +464,10 @@ public final class HyperLogLogPlusPlus implements Releasable {
             for (int j = 0; j < capacity; ++j) {
                 final int k = get(j);
                 if (k != 0) {
-                    values.set(i++, k);
+                    values[i++] = k;
                 }
             }
-            assert i == values.size();
+            assert i == values.length;
             return values;
         }
 
@@ -488,11 +477,10 @@ public final class HyperLogLogPlusPlus implements Releasable {
         out.writeVInt(p);
         if (algorithm == LINEAR_COUNTING) {
             out.writeBoolean(LINEAR_COUNTING);
-            try (IntArray hashes = hashSet.values()) {
-                out.writeVLong(hashes.size());
-                for (long i = 0; i < hashes.size(); ++i) {
-                    out.writeInt(hashes.get(i));
-                }
+            int[] hashes = hashSet.values();
+            out.writeVLong(hashes.length);
+            for (int i = 0; i < hashes.length; ++i) {
+                out.writeInt(hashes[i]);
             }
         } else {
             out.writeBoolean(HYPERLOGLOG);
