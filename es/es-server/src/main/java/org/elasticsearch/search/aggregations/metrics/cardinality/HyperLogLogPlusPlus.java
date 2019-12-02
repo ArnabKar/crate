@@ -139,7 +139,7 @@ public final class HyperLogLogPlusPlus implements Releasable {
 
     private final BigArrays bigArrays;
     private boolean algorithm = LINEAR_COUNTING;
-    private ByteArray runLens;
+    private final ByteArray runLens;
     private final Hashset hashSet;
     private final int p, m;
     private final double alphaMM;
@@ -175,15 +175,10 @@ public final class HyperLogLogPlusPlus implements Releasable {
         return p;
     }
 
-    private void ensureCapacity() {
-        runLens = bigArrays.grow(runLens, 1 << p);
-    }
-
     public void merge(HyperLogLogPlusPlus other) {
         if (p != other.p) {
             throw new IllegalArgumentException();
         }
-        ensureCapacity();
         if (other.algorithm == LINEAR_COUNTING) {
             final IntArray values = other.hashSet.values();
             try {
@@ -211,7 +206,6 @@ public final class HyperLogLogPlusPlus implements Releasable {
     }
 
     public void collect(long hash) {
-        ensureCapacity();
         if (algorithm == LINEAR_COUNTING) {
             collectLc(hash);
         } else {
@@ -287,7 +281,6 @@ public final class HyperLogLogPlusPlus implements Releasable {
     }
 
     private void upgradeToHll() {
-        ensureCapacity();
         final IntArray values = hashSet.values();
         try {
             runLens.fill(0, m, (byte) 0);
