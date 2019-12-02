@@ -122,13 +122,13 @@ public class HyperLogLogDistinctAggregationTest extends AggregationTest {
 
         // bytes types
         assertThat(HyperLogLogDistinctAggregation.Murmur3Hash.getForType(DataTypes.STRING).hash("foo"),
-            is(-2129773440516405919L));
+            is(1208210750032620489L));
         assertThat(HyperLogLogDistinctAggregation.Murmur3Hash.getForType(DataTypes.BOOLEAN).hash(true),
-            is(7529381342917315814L));
+            is(4312328700069294139L));
 
         // ip type
         assertThat(HyperLogLogDistinctAggregation.Murmur3Hash.getForType(DataTypes.IP).hash("127.0.0.1"),
-            is(5662530066633765140L));
+            is(6044143379282500354L));
     }
 
     @Test
