@@ -20,7 +20,6 @@
 package org.elasticsearch.search.aggregations.metrics.cardinality;
 
 import org.apache.lucene.util.BytesRef;
-import org.apache.lucene.util.LongBitSet;
 import org.apache.lucene.util.packed.PackedInts;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
@@ -34,11 +33,6 @@ import org.elasticsearch.common.util.IntArray;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 
 /**
  * Hyperloglog++ counter, implemented based on pseudo code from
@@ -292,7 +286,7 @@ public final class HyperLogLogPlusPlus implements Releasable {
         }
     }
 
-    void upgradeToHll() {
+    private void upgradeToHll() {
         ensureCapacity();
         final IntArray values = hashSet.values(0);
         try {
@@ -307,11 +301,11 @@ public final class HyperLogLogPlusPlus implements Releasable {
         }
     }
 
-    static long linearCounting(long m, long v) {
+    private static long linearCounting(long m, long v) {
         return Math.round(m * Math.log((double) m / v));
     }
 
-    static long mask(int bits) {
+    private static long mask(int bits) {
         return (1L << bits) - 1;
     }
 
@@ -405,40 +399,6 @@ public final class HyperLogLogPlusPlus implements Releasable {
     @Override
     public void close() {
         Releasables.close(runLens, hashSet.sizes);
-    }
-
-    private Object getComparableData() {
-        if (algorithm == LINEAR_COUNTING) {
-            Set<Integer> values = new HashSet<>();
-            try (IntArray hashSetValues = hashSet.values(0)) {
-                for (long i = 0; i < hashSetValues.size(); i++) {
-                    values.add(hashSetValues.get(i));
-                }
-            }
-            return values;
-        } else {
-            Map<Byte, Integer> values = new HashMap<>();
-            for (long i = 0; i < runLens.size(); i++) {
-                byte runLength = runLens.get(i);
-                Integer numOccurances = values.get(runLength);
-                if (numOccurances == null) {
-                    values.put(runLength, 1);
-                } else {
-                    values.put(runLength, numOccurances + 1);
-                }
-            }
-            return values;
-        }
-    }
-
-    public int hashCode(long bucket) {
-        return Objects.hash(p, algorithm, getComparableData());
-    }
-
-    public boolean equals(long bucket, HyperLogLogPlusPlus other) {
-        return Objects.equals(p, other.p) &&
-                Objects.equals(algorithm, other.algorithm) &&
-                Objects.equals(getComparableData(), other.getComparableData());
     }
 
     /**
