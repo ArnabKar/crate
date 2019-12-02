@@ -401,6 +401,10 @@ public final class HyperLogLogPlusPlus implements Releasable {
         Releasables.close(runLens);
     }
 
+    private static long index(int index) {
+        return index << 2;
+    }
+
     /**
      * We are actually using HyperLogLog's runLens array but interpreting it as a hash set
      * for linear counting.
@@ -420,10 +424,6 @@ public final class HyperLogLogPlusPlus implements Releasable {
             mask = capacity - 1;
             readSpare = new BytesRef();
             writeSpare = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN);
-        }
-
-        private long index (int index) {
-            return (index << 2);
         }
 
         private int get(int index) {
