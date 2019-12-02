@@ -190,10 +190,8 @@ public final class HyperLogLogPlusPlus implements Releasable {
             if (algorithm != HYPERLOGLOG) {
                 upgradeToHll();
             }
-            final long thisStart = 0;
-            final long otherStart = 0;
             for (int i = 0; i < m; ++i) {
-                runLens.set(thisStart + i, (byte) Math.max(runLens.get(thisStart + i), other.runLens.get(otherStart + i)));
+                runLens.set(i, (byte) Math.max(runLens.get(i), other.runLens.get(i)));
             }
         }
     }
