@@ -26,6 +26,7 @@ import com.carrotsearch.hppc.cursors.ObjectCursor;
 import com.google.common.annotations.VisibleForTesting;
 import io.crate.breaker.RamAccounting;
 import io.crate.breaker.RamAccountingContext;
+import io.crate.breaker.SingleRamAccounting;
 import io.crate.data.BatchIterator;
 import io.crate.data.Row;
 import io.crate.data.RowConsumer;
@@ -39,6 +40,7 @@ import org.elasticsearch.index.engine.Engine;
 import org.elasticsearch.threadpool.ThreadPool;
 
 import javax.annotation.Nonnull;
+import java.util.HashSet;
 import java.util.Locale;
 
 public class CollectTask extends AbstractTask {
@@ -52,6 +54,7 @@ public class CollectTask extends AbstractTask {
     private final IntObjectHashMap<Engine.Searcher> searchers = new IntObjectHashMap<>();
     private final Object subContextLock = new Object();
     private final RowConsumer consumer;
+    private final HashSet<Long> threads = new HashSet<>();
 
     private BatchIterator<Row> batchIterator = null;
     private long totalBytes = -1;
@@ -156,7 +159,13 @@ public class CollectTask extends AbstractTask {
     }
 
     public RamAccounting getRamAccounting() {
-        return queryPhaseRamAccountingContext;
+        return new SingleRamAccounting(
+            numBytes -> {
+                queryPhaseRamAccountingContext.addBytes(numBytes);
+                return numBytes;
+            },
+            numBytes -> queryPhaseRamAccountingContext.addBytes(-numBytes)
+        );
     }
 
     public SharedShardContexts sharedShardContexts() {
